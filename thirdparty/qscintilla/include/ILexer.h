@@ -45,6 +45,7 @@ public:
 	virtual bool SCI_METHOD IsDBCSLeadByte(char ch) const = 0;
 	virtual const char * SCI_METHOD BufferPointer() = 0;
 	virtual int SCI_METHOD GetLineIndentation(Sci_Position line) = 0;
+	virtual ~IDocument() = default; 
 };
 
 class IDocumentWithLineEnd : public IDocument {
@@ -69,6 +70,7 @@ public:
 	virtual void SCI_METHOD Lex(Sci_PositionU startPos, Sci_Position lengthDoc, int initStyle, IDocument *pAccess) = 0;
 	virtual void SCI_METHOD Fold(Sci_PositionU startPos, Sci_Position lengthDoc, int initStyle, IDocument *pAccess) = 0;
 	virtual void * SCI_METHOD PrivateCall(int operation, void *pointer) = 0;
+	virtual ~ILexer() = default;
 };
 
 class ILexerWithSubStyles : public ILexer {
@@ -91,6 +93,7 @@ public:
 	// Returns a status code from SC_STATUS_*
 	virtual int SCI_METHOD AddData(char *data, Sci_Position length) = 0;
 	virtual void * SCI_METHOD ConvertToDocument() = 0;
+	virtual ~ILoader() = default;
 };
 
 #ifdef SCI_NAMESPACE

@@ -137,6 +137,8 @@ QMAKE_CXXFLAGS += -Wextra -Werror=cast-qual -Werror=write-strings -Werror=redund
 
 GLOBAL_PWD = $$PWD
 
+INCLUDEPATH += $$GLOBAL_PWD/thirdparty/qscintilla/Qt4Qt5
+
 # Useful function to copy additional files to destination,
 # from http://stackoverflow.com/questions/3984104/qmake-how-to-copy-a-file-to-the-output
 defineTest(copyToDestdir) {

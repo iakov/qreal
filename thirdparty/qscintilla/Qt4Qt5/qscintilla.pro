@@ -20,12 +20,17 @@
 
 # This must be kept in sync with Python/configure.py, Python/configure-old.py,
 # example-Qt4Qt5/application.pro and designer-Qt4Qt5/designer.pro.
+
+#Patched by Iakov Kirilenko for use with QReal
+include(../../../global.pri)
 !win32:VERSION = 13.0.0
 
+
 TEMPLATE = lib
-TARGET = qscintilla2_qt$${QT_MAJOR_VERSION}
+#TARGET = qscintilla2_qt$${QT_MAJOR_VERSION}
+TARGET = qscintilla2
 CONFIG += qt warn_off thread exceptions hide_symbols
-INCLUDEPATH += . ../include ../lexlib ../src
+INCLUDEPATH += $$PWD $$PWD/../include $$PWD/../lexlib $$PWD/../src
 
 !CONFIG(staticlib) {
     DEFINES += QSCINTILLA_MAKE_DLL
@@ -45,7 +50,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 
 # Comment this in if you want the internal Scintilla classes to be placed in a
 # Scintilla namespace rather than pollute the global namespace.
-#DEFINES += SCI_NAMESPACE
+DEFINES += SCI_NAMESPACE
 
 target.path = $$[QT_INSTALL_LIBS]
 INSTALLS += target
