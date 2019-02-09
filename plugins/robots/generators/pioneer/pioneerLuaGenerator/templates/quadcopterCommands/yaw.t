@@ -1,0 +1,1 @@
+		ap.updateYaw((@@ANGLE@@ / 180.0 * math.pi) % (2.0 * math.pi))

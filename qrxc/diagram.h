@@ -1,3 +1,17 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #pragma once
 
 #include <QtCore/QString>
@@ -11,9 +25,9 @@ class Editor;
 class Diagram
 {
 public:
-	Diagram(QString const &name, QString const &nodeName, QString const &displayedName, Editor *editor);
+	Diagram(const QString &name, const QString &nodeName, const QString &displayedName, Editor *editor);
 	~Diagram();
-	bool init(QDomElement const &diagramElement);
+	bool init(const QDomElement &diagramElement);
 	bool resolve();
 	Editor *editor() const;
 	Type *findType(QString name);
@@ -21,6 +35,9 @@ public:
 	QString name() const;
 	QString nodeName() const;
 	QString displayedName() const;
+	QList<QPair<QString, QStringList>> paletteGroups() const;
+	QMap<QString, QString> paletteGroupsDescriptions() const;
+	bool shallPaletteBeSorted() const;
 
 private:
 	struct ImportSpecification {
@@ -34,8 +51,12 @@ private:
 	QString mDiagramNodeName;
 	QString mDiagramDisplayedName;
 	Editor *mEditor;
+	QList<QPair<QString, QStringList>> mPaletteGroups;
+	QMap<QString, QString> mPaletteGroupsDescriptions;
 	QList<ImportSpecification> mImports;
+	bool mShallPaletteBeSorted;
 
-	bool initGraphicTypes(QDomElement const &graphicTypesElement);
-	bool initNonGraphicTypes(QDomElement const &nonGraphicTypesElement);
+	bool initGraphicTypes(const QDomElement &graphicTypesElement);
+	bool initNonGraphicTypes(const QDomElement &nonGraphicTypesElement);
+	void initPalette(const QDomElement &paletteElement);
 };

@@ -1,10 +1,25 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #include <QtCore/QFile>
 
 #include "dispatcherGenerator.h"
-#include "nameNormalizer.h"
+#include <qrutils/nameNormalizer.h>
 
 using namespace ubiq::generator;
 using namespace qReal;
+using namespace utils;
 
 DispatcherGenerator::DispatcherGenerator(QString const &templateDirPath
 		, QString const &outputDirPath
@@ -23,7 +38,7 @@ void DispatcherGenerator::generate()
 {
 	loadUtilsTemplates();
 
-	foreach (Id const &masterNode, mApi.elementsByType("MasterNode")) {
+	for (Id const &masterNode : mApi.elementsByType("MasterNode")) {
 		if (!mApi.isLogicalElement(masterNode)) {
 			continue;
 		}
@@ -50,7 +65,7 @@ void DispatcherGenerator::generate()
 QString DispatcherGenerator::generateEventHandlers(Id const &diagram) const
 {
 	QString eventHadlers;
-	foreach (Id const &element, mApi.children(diagram)) {
+	for (Id const &element : mApi.children(diagram)) {
 		if (!mApi.isLogicalElement(element) || element.element() != "Handler") {
 			continue;
 		}
@@ -63,7 +78,7 @@ QString DispatcherGenerator::generateEventHandlers(Id const &diagram) const
 QString DispatcherGenerator::generatePreprocessors(Id const &masterNode) const
 {
 	QString preprocessors;
-	foreach (Id const &element, mApi.children(masterNode)) {
+	for (Id const &element : mApi.children(masterNode)) {
 		if (!mApi.isLogicalElement(element) || element.element() != "Preprocessor") {
 			continue;
 		}
@@ -76,7 +91,7 @@ QString DispatcherGenerator::generatePreprocessors(Id const &masterNode) const
 QString DispatcherGenerator::generateConstants(qReal::Id const &element) const
 {
 	QString result;
-	foreach (Id const &id, mApi.children(element)) {
+	for (Id const &id : mApi.children(element)) {
 		if (!mApi.isLogicalElement(id) || id.element() != "MasterDiagramConstant") {
 			continue;
 		}
@@ -98,7 +113,7 @@ QString DispatcherGenerator::generateConstants(qReal::Id const &element) const
 QString DispatcherGenerator::generateFields(qReal::Id const &element) const
 {
 	QString result;
-	foreach (Id const &id, mApi.children(element)) {
+	for (Id const &id : mApi.children(element)) {
 		if (!mApi.isLogicalElement(id) || id.element() != "MasterDiagramField") {
 			continue;
 		}
@@ -126,7 +141,7 @@ QString DispatcherGenerator::generateFields(qReal::Id const &element) const
 QString DispatcherGenerator::generateMessageInputMethods(qReal::Id const &element) const
 {
 	QString result;
-	foreach (Id const &id, mApi.children(element)) {
+	for (Id const &id : mApi.children(element)) {
 		if (!mApi.isLogicalElement(id) || id.element() != "Handler") {
 			continue;
 		}
@@ -149,12 +164,12 @@ QString DispatcherGenerator::generateMessageInputMethods(qReal::Id const &elemen
 QString DispatcherGenerator::generateHelperFunctions(qReal::Id const &element) const
 {
 	QString result;
-	foreach (Id const &diagram, mApi.outgoingConnections(element)) {
+	for (Id const &diagram : mApi.outgoingConnections(element)) {
 		if (!mApi.isLogicalElement(diagram) || diagram.element() != "UbiqActivityDiagram") {
 			continue;
 		}
 
-		foreach (Id const &id, mApi.children(diagram)) {
+		for (Id const &id : mApi.children(diagram)) {
 			if (!mApi.isLogicalElement(id) || (id.element() != "FormalParameters")) {
 				continue;
 			}
@@ -184,7 +199,7 @@ QString DispatcherGenerator::generateHelperFunctions(qReal::Id const &element) c
 QString DispatcherGenerator::generateFunctionParameters(qReal::Id const &element) const
 {
 	QString result;
-	foreach (Id const &id, mApi.children(element)) {
+	for (Id const &id : mApi.children(element)) {
 		if (!mApi.isLogicalElement(id) || id.element() != "FormalParameter") {
 			continue;
 		}
@@ -210,7 +225,7 @@ QString DispatcherGenerator::generateEventHandler(QString const &handlerName) co
 	QString handlerCode = mTemplateUtils["@@EventHandler@@"];
 	handlerCode.replace("@@HandlerName@@", handlerName);
 
-	foreach (Id const &diagram, mApi.elementsByType("UbiqActivityDiagram")) {
+	for (Id const &diagram : mApi.elementsByType("UbiqActivityDiagram")) {
 		// search for the diagram with name handlerName
 		if (!mApi.isLogicalElement(diagram) || (mApi.name(diagram) != handlerName)) {
 			continue;
@@ -218,13 +233,13 @@ QString DispatcherGenerator::generateEventHandler(QString const &handlerName) co
 
 		// diagram found, now get HandlerStart-s and generate cases
 		QString cases;
-		foreach (Id const &element, mApi.children(diagram)) {
+		for (Id const &element : mApi.children(diagram)) {
 			if (!mApi.isLogicalElement(element) || (element.element() != "HandlerStart")) {
 				continue;
 			}
 
 			QString caseStmts;
-			foreach (QString const &caseLabel, mApi.name(element).split(",", QString::SkipEmptyParts)) {
+			for (QString const &caseLabel : mApi.name(element).split(",", QString::SkipEmptyParts)) {
 				QString caseStmtTemplate = mTemplateUtils["@@Case@@"];
 				caseStmtTemplate.replace("@@CaseValue@@", caseLabel.trimmed());
 				caseStmts += caseStmtTemplate;
@@ -258,14 +273,14 @@ QString DispatcherGenerator::generatePreprocessor(QString const &preprocessorNam
 	QString preprocessorCode = mTemplateUtils["@@Preprocessor@@"];
 	preprocessorCode.replace("@@PreprocessorName@@", preprocessorName);
 
-	foreach (Id const &diagram, mApi.elementsByType("UbiqActivityDiagram")) {
+	for (Id const &diagram : mApi.elementsByType("UbiqActivityDiagram")) {
 		// search for the diagram with name preprocessorName
 		if (!mApi.isLogicalElement(diagram) || (mApi.name(diagram) != preprocessorName)) {
 			continue;
 		}
 
 		QString code;
-		foreach (Id const &child, mApi.children(diagram)) {
+		for (Id const &child : mApi.children(diagram)) {
 			if (!mApi.isLogicalElement(child) || (child.element() != "InitialNode")) {
 				continue;
 			}
@@ -295,12 +310,13 @@ QString DispatcherGenerator::generateCaseBody(qReal::Id const &handlerStart) con
 	return generateOperatorCode(nextNode).text;
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateFunctionCallCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateFunctionCallCode(
+		qReal::Id const &currentNode) const
 {
 	QString operatorCode = mTemplateUtils["@@CaseCode@@"];
 
 	QString code = mApi.name(currentNode) + "(";
-	foreach (Id const &argument, mApi.children(currentNode)) {
+	for (Id const &argument : mApi.children(currentNode)) {
 		if (!mApi.isLogicalElement(argument) || (argument.element() != "ActualParameter")) {
 			continue;
 		}
@@ -311,7 +327,7 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateFun
 	code += ")";
 
 	QString returnValue;
-	foreach (Id const &argument, mApi.children(currentNode)) {
+	for (Id const &argument : mApi.children(currentNode)) {
 		if (!mApi.isLogicalElement(argument) || (argument.element() != "ReturnValue")) {
 			continue;
 		}
@@ -357,7 +373,8 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateFun
 	return result;
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateActionCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateActionCode(
+		qReal::Id const &currentNode) const
 {
 	QString operatorCode = mApi.name(currentNode);
 
@@ -377,7 +394,8 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateAct
 	return result;
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateInitialNodeCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateInitialNodeCode(
+		qReal::Id const &currentNode) const
 {
 	IdList const links = mApi.outgoingLinks(currentNode);
 
@@ -391,7 +409,8 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateIni
 	return generateOperatorCode(nextNode);
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateReturnActionCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateReturnActionCode(
+		qReal::Id const &currentNode) const
 {
 	QString const returnValue = mApi.name(currentNode).isEmpty()
 			? ""
@@ -411,13 +430,14 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateRet
 	}
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDecisionNodeCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDecisionNodeCode(
+		qReal::Id const &currentNode) const
 {
 	Id thenBranch;
 	Id elseBranch;
-	Id *currentBranch = NULL;
+	Id *currentBranch = nullptr;
 
-	foreach (Id const &link, mApi.outgoingLinks(currentNode)) {
+	for (Id const &link : mApi.outgoingLinks(currentNode)) {
 		if (!mApi.stringProperty(link, "guard").isEmpty()) {
 			currentBranch = &thenBranch;
 		} else {
@@ -426,17 +446,23 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDec
 		if (*currentBranch == Id()) {
 			*currentBranch = link;
 		} else {
-			mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link without guard"), currentNode);
+			mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link without guard")
+					, currentNode);
+
 			return CodeBranchGenerationResult("", currentNode);
 		}
 	}
 
 	if (thenBranch == Id()) {
-		mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link with guard"), currentNode);
+		mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link with guard")
+				, currentNode);
+
 		return CodeBranchGenerationResult("", currentNode);
 	}
 	if (elseBranch == Id()) {
-		mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link without guard"), currentNode);
+		mErrorReporter.addError(QObject::tr("Decision node shall have exactly one outgoing link without guard")
+				, currentNode);
+
 		return CodeBranchGenerationResult("", currentNode);
 	}
 
@@ -444,8 +470,11 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDec
 
 	QString ifTemplate = mTemplateUtils["@@If@@"];
 
-	CodeBranchGenerationResult thenBranchGenerationResult = generateOperatorCode(mApi.otherEntityFromLink(thenBranch, currentNode));
-	CodeBranchGenerationResult elseBranchGenerationResult = generateOperatorCode(mApi.otherEntityFromLink(elseBranch, currentNode));
+	CodeBranchGenerationResult thenBranchGenerationResult = generateOperatorCode(mApi.otherEntityFromLink(thenBranch
+			, currentNode));
+
+	CodeBranchGenerationResult elseBranchGenerationResult = generateOperatorCode(mApi.otherEntityFromLink(elseBranch
+			, currentNode));
 
 	if (thenBranchGenerationResult.text.endsWith('\n')) {
 		thenBranchGenerationResult.text.chop(1);
@@ -482,7 +511,9 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDec
 	if (links.size() == 0) {
 		return CodeBranchGenerationResult(ifTemplate, nextNode);
 	} else if (links.size() > 1) {
-		mErrorReporter.addError(QObject::tr("Branches merge node should have no more than 1 outgoing link"), currentNode);
+		mErrorReporter.addError(QObject::tr("Branches merge node should have no more than 1 outgoing link")
+				, currentNode);
+
 		return CodeBranchGenerationResult("", nextNode);
 	}
 
@@ -493,7 +524,8 @@ DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateDec
 	return result;
 }
 
-DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateOperatorCode(qReal::Id const &currentNode) const
+DispatcherGenerator::CodeBranchGenerationResult DispatcherGenerator::generateOperatorCode(
+		qReal::Id const &currentNode) const
 {
 	if (currentNode.element() == "FunctionCall") {
 		return generateFunctionCallCode(currentNode);

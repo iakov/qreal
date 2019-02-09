@@ -1,16 +1,28 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #include "sdftocpp.h"
 
-#include <QMessageBox>
-#include <QFont>
-#include <QIcon>
-#include <QLineF>
-#include <QTime>
-#include <QDebug>
+#include <QtGui/QFont>
+#include <QtGui/QIcon>
+#include <QtCore/QLineF>
+#include <QtCore/QTime>
+#include <QtCore/QDebug>
 
 SdfRenderer::SdfRenderer()
 	: mStartX(0), mStartY(0), mNeedScale(true)
 {
-//    	toGenerator = new QString();
 	toGen.setString(&toGenerator,QIODevice::ReadWrite);
 }
 
@@ -20,16 +32,14 @@ SdfRenderer::SdfRenderer(const QString path)
 	if (!load(path))
 	{
 		qDebug() << "File " + path + " - loading failed!";
-//		QMessageBox::information(0,"1","2");
 	}
-//	toGenerator = new QString();
 	toGen.setString(&toGenerator,QIODevice::ReadWrite);
 }
 
 SdfRenderer::~SdfRenderer()
 {
-//    delete toGenerator;
 }
+
 SdfRenderer::SdfRenderer(const QDomNode &bla)
 {
 	toGen.setString(&toGenerator, QIODevice::ReadWrite);
@@ -69,7 +79,6 @@ QString SdfRenderer::render()
 	current_size_y = first_size_y;
 	mStartX = static_cast<int>(bounds.x());
 	mStartY = static_cast<int>(bounds.y());
-	this->painter = painter;
 	QDomElement docElem = doc.documentElement();
 	QDomNode node = docElem.firstChild();
 	while(!node.isNull())
@@ -252,13 +261,13 @@ void SdfRenderer::polygon(QDomElement &element)
 {
 	parsestyle(element);
 	// FIXME: init points array here
-	QPoint *points = NULL;
+	QPoint *points = nullptr;
 	int n = element.attribute("n").toInt();
 	if (!element.isNull())
 	{
 		points = getpoints(element, n);
 	}
-	if (points != NULL)
+	if (points != nullptr)
 	{
 //		painter->drawConvexPolygon(points, n);
 		delete[] points;
@@ -581,19 +590,12 @@ void SdfRenderer::noScale()
 }
 
 
-SdfIconEngineV2::SdfIconEngineV2(QString const &file)
+SdfIconEngineV2::SdfIconEngineV2(const QString &file)
 {
 	mRenderer.load(file);
 	mRenderer.noScale();
 }
 
-void SdfIconEngineV2::paint(QPainter* /*painter*/, QRect const &/*rect*/,
-	QIcon::Mode /*mode*/, QIcon::State /*state*/)
+void SdfIconEngineV2::paint(QPainter* /*painter*/, const QRect &/*rect*/, QIcon::Mode /*mode*/, QIcon::State /*state*/)
 {
-/*	painter->eraseRect(rect);
-	painter->setRenderHint(QPainter::Antialiasing, true);
-	QRect adjustedRect(rect.x(), rect.y(), rect.width() - 1, rect.height() - 1);
-	qDebug() << rect;
-	//mRenderer.render(painter, rect);
-*/
 }

@@ -1,45 +1,123 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #include "nodeType.h"
+
+#include <QtCore/QDebug>
+
+#include <qrutils/outFile.h>
+
 #include "diagram.h"
 #include "xmlCompiler.h"
-#include "../qrutils/outFile.h"
 #include "pointPort.h"
 #include "linePort.h"
+#include "circularPort.h"
 #include "editor.h"
 #include "nameNormalizer.h"
 #include "label.h"
 
-#include <QDebug>
-
 using namespace utils;
 
 NodeType::NodeType(Diagram *diagram)
-: GraphicType(diagram)
-, mIsPin(false)
-, mIsHavePin(false)
-, mIsResizeable(true)
-{}
+		: GraphicType(diagram)
+		, mIsResizeable(true)
+{
+}
 
 NodeType::~NodeType()
 {
-	foreach (Port *port, mPorts)
-		delete port;
+	qDeleteAll(mPointPorts);
+	qDeleteAll(mLinePorts);
+	qDeleteAll(mCircularPorts);
 }
 
 Type* NodeType::clone() const
 {
 	NodeType *result = new NodeType(mDiagram);
 	GraphicType::copyFields(result);
-	foreach (Port *port, mPorts)
-		result->mPorts.append(port->clone());
+
+	for (Port *port : mPointPorts) {
+		result->mPointPorts << port->clone();
+	}
+
+	for (Port *port : mLinePorts) {
+		result->mLinePorts << port->clone();
+	}
+
+	for (Port *port : mCircularPorts) {
+		result->mCircularPorts << port->clone();
+	}
+
 	result->mSdfDomElement = mSdfDomElement;
 	result->mPortsDomElement = mPortsDomElement;
-	result->mIsPin = mIsPin;
-	result->mIsHavePin = mIsHavePin;
 	result->mIsResizeable = mIsResizeable;
 	return result;
 }
 
-bool NodeType::initAssociations()
+bool NodeType::copyPictures(GraphicType *parent)
+{
+	const NodeType * const nodeParent = dynamic_cast<NodeType*>(parent);
+	if (nodeParent != nullptr) {
+		if (mSdfDomElement.isNull()) {
+			/// @todo Support this.
+			if (!nodeParent->mSdfDomElement.isNull()) {
+				qWarning() << name()
+						<< ": Inheriting pictures for an element without <picture> tag is not currently supported";
+			}
+		} else {
+			mWidth = qMax(mWidth, nodeParent->mWidth);
+			mHeight = qMax(mHeight, nodeParent->mHeight);
+
+			for (QDomNode sdfPrimitive = nodeParent->mSdfDomElement.firstChild();
+					!sdfPrimitive.isNull();
+					sdfPrimitive = sdfPrimitive.nextSibling())
+			{
+				mSdfDomElement.appendChild(sdfPrimitive.cloneNode());
+			}
+
+			mVisible = mVisible || nodeParent->mVisible;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+bool NodeType::initRoles()
+{
+	return true;
+}
+
+bool NodeType::initRoleProperties()
+{
+	return true;
+}
+
+QString NodeType::propertyName(Property *property, const QString &roleName)
+{
+	Q_UNUSED(property);
+	Q_UNUSED(roleName);
+	return "";
+}
+
+bool NodeType::initDividability()
+{
+	return true;
+}
+
+bool NodeType::initPortTypes()
 {
 	return true;
 }
@@ -57,8 +135,10 @@ bool NodeType::initSdf()
 		mHeight = sdfElement.attribute("sizey").toInt();
 		mSdfDomElement = sdfElement;
 		mVisible = true;
-	} else
+	} else {
 		mVisible = false;
+	}
+
 	return true;
 }
 
@@ -68,307 +148,210 @@ void NodeType::generateSdf() const
 
 	OutFile out("generated/shapes/" + resourceName("Class"));
 	mSdfDomElement.save(out(), 1);
-
-	//	QDomNodeList images = mSdfDomElement.elementsByTagName("image");
-
-	/*	for (int i = 0; i < images.size(); ++i) {
-  QString const name = images.at(i).toElement().attribute("name");
-  mDiagram->editor()->xmlCompiler()->addResource("\t<file>" + name + "</file>\n");
- }
- */
 }
 
 bool NodeType::initPorts()
 {
 	QDomElement portsElement = mGraphics.firstChildElement("ports");
-	if (portsElement.isNull())
+
+	if (portsElement.isNull()) {
 		return true;
+	}
+
 	mPortsDomElement = portsElement;
 	initPointPorts(portsElement);
 	initLinePorts(portsElement);
+	initCircularPorts(portsElement);
 
 	return true;
 }
 
-bool NodeType::initPointPorts(QDomElement const &portsElement)
+bool NodeType::initPointPorts(const QDomElement &portsElement)
 {
-	for (QDomElement portElement = portsElement.firstChildElement("pointPort");
-	!portElement.isNull();
-	portElement = portElement.nextSiblingElement("pointPort"))
+	for (QDomElement portElement = portsElement.firstChildElement("pointPort")
+			; !portElement.isNull()
+			; portElement = portElement.nextSiblingElement("pointPort"))
 	{
 		Port *pointPort = new PointPort();
 		if (!pointPort->init(portElement, mWidth, mHeight)) {
 			delete pointPort;
 			return false;
 		}
-		mPorts.append(pointPort);
+
+		mPointPorts << pointPort;
 	}
+
 	return true;
 }
 
-bool NodeType::initLinePorts(QDomElement const &portsElement)
+bool NodeType::initLinePorts(const QDomElement &portsElement)
 {
-	for (QDomElement portElement = portsElement.firstChildElement("linePort");
-	!portElement.isNull();
-	portElement = portElement.nextSiblingElement("linePort"))
+	for (QDomElement portElement = portsElement.firstChildElement("linePort")
+			; !portElement.isNull()
+			; portElement = portElement.nextSiblingElement("linePort"))
 	{
 		Port *linePort = new LinePort();
-		if (!linePort->init(portElement, mWidth, mHeight))
-		{
+		if (!linePort->init(portElement, mWidth, mHeight)) {
 			delete linePort;
 			return false;
 		}
-		mPorts.append(linePort);
+
+		mLinePorts << linePort;
 	}
+
 	return true;
 }
 
-bool NodeType::initLabel(Label *label, QDomElement const &element, int const &count)
+bool NodeType::initCircularPorts(const QDomElement &portsElement)
+{
+	for (QDomElement portElement = portsElement.firstChildElement("circularPort");
+			!portElement.isNull();
+			portElement = portElement.nextSiblingElement("circularPort"))
+	{
+		Port *circularPort = new CircularPort();
+		if (!circularPort->init(portElement, mWidth, mHeight)) {
+			delete circularPort;
+			return false;
+		}
+
+		mCircularPorts.append(circularPort);
+	}
+
+	return true;
+}
+
+bool NodeType::initLabel(Label *label, const QDomElement &element, const int &count)
 {
 	return label->init(element, count, true, mWidth, mHeight);
 }
 
 bool NodeType::initBooleanProperties()
 {
-	mIsPin = false;
-	mIsHavePin = false;
 	mIsResizeable = true;
-	QDomElement const element = mLogic.firstChildElement("pin");
-	if (!element.isNull())
-		mIsPin = true;
-	QDomElement const element1 = mLogic.firstChildElement("action");
-	if (!element1.isNull())
-		mIsHavePin = true;
-	QDomElement const element2 = mGraphics.firstChildElement("nonResizeable");
-	if (!element2.isNull())
+
+	const QDomElement element2 = mGraphics.firstChildElement("nonResizeable");
+	if (!element2.isNull()) {
 		mIsResizeable = false;
+	}
+
 	return true;
-}
-
-void NodeType::generatePorts() const
-{
-	mDiagram->editor()->xmlCompiler()->addResource("\t<file>generated/shapes/" + resourceName("Ports") + "</file>\n");
-
-	OutFile out("generated/shapes/" + resourceName("Ports"));
-	out() << "<picture ";
-	out() << "sizex=\"" << mWidth << "\" ";
-	out() << "sizey=\"" << mHeight << "\" ";
-	out() << ">\n";
-
-	generatePointPorts(mPortsDomElement, out);
-	generateLinePorts(mPortsDomElement, out);
-
-	out() << "</picture>\n";
-}
-
-void NodeType::generatePointPorts(QDomElement const &portsElement, OutFile &out) const
-{
-	for (QDomElement portElement = portsElement.firstChildElement("pointPort"); !portElement.isNull();
-	portElement = portElement.nextSiblingElement("pointPort"))
-	{
-		out() << "\t<point stroke-width=\"11\" stroke-style=\"solid\" stroke=\"#c3dcc4\" ";
-		out() << "x1=\""<<portElement.attribute("x") << "\" y1=\""<<portElement.attribute("y") << "\" ";
-		out() << "/>\n";
-		out() << "\t<point stroke-width=\"3\" stroke-style=\"solid\" stroke=\"#465945\" ";
-		out() << "x1=\"" << portElement.attribute("x") << "\" y1=\"" << portElement.attribute("y") << "\" ";
-		out() << "/>\n";
-	}
-}
-
-void NodeType::generateLinePorts(QDomElement const &portsElement, OutFile &out) const
-{
-	for (QDomElement portElement = portsElement.firstChildElement("linePort"); !portElement.isNull();
-	portElement = portElement.nextSiblingElement("linePort"))
-	{
-		QDomElement portStartElement = portElement.firstChildElement("start");
-		QDomElement portEndElement = portElement.firstChildElement("end");
-
-		out() << "\t<line x1=\"" << portStartElement.attribute("startx") << "\" y1=\"" << portStartElement.attribute("starty") << "\" ";
-		out() << "x2=\"" << portEndElement.attribute("endx") << "\" y2=\"" << portEndElement.attribute("endy") << "\" ";
-		out() << "stroke-width=\"7\" stroke-style=\"solid\" stroke=\"#c3dcc4\" ";
-		out() << "/>\n";
-
-		out() << "\t<line x1=\"" << portStartElement.attribute("startx") << "\" y1=\""<<portStartElement.attribute("starty") << "\" ";
-		out() << "x2=\""<<portEndElement.attribute("endx") << "\" y2=\"" << portEndElement.attribute("endy") << "\" ";
-		out() << "stroke-width=\"1\" stroke-style=\"solid\" stroke=\"#465945\" ";
-		out() << "/>\n";
-	}
-}
-
-bool NodeType::hasPointPorts()
-{
-	foreach (Port *port, mPorts){
-		if (dynamic_cast<PointPort*>(port))
-			return true;
-	}
-	return false;
-}
-
-bool NodeType::hasLinePorts()
-{
-	foreach (Port *port, mPorts){
-		if (dynamic_cast<LinePort*>(port))
-			return true;
-	}
-	return false;
 }
 
 void NodeType::generateCode(OutFile &out)
 {
-	generateSdf();
-	generatePorts();
-
-	QString const className = NameNormalizer::normalize(qualifiedName());
-	bool hasSdf = false;
-	bool hasPorts = false;
-
-	out() << "\tclass " << className << " : public ElementImpl\n\t{\n"
-	<< "\tpublic:\n";
-
-	if (!mBonusContextMenuFields.empty()) {
-		out() << "\t\t" << className << "()\n\t\t{\n";
-		out() << "\t\t\tmBonusContextMenuFields";
-		foreach (QString elem, mBonusContextMenuFields) {
-			out() << " << " << "\"" << elem << "\"";
-		}
-		out() << ";\n";
-		out() << "\t\t}\n\n";
+	if (!mSdfDomElement.isNull()) {
+		generateSdf();
 	}
 
-	out () << "\t\tvoid init(ElementTitleFactoryInterface &, QList<ElementTitleInterface*> &) {}\n\n"
-	<< "\t\tvoid init(QRectF &contents, QList<StatPoint> &pointPorts,\n"
-	<< "\t\t\t\t\t\t\tQList<StatLine> &linePorts, ElementTitleFactoryInterface &factory,\n"
-	<< "\t\t\t\t\t\t\tQList<ElementTitleInterface*> &titles, SdfRendererInterface *renderer,\n"
-	<< "\t\t\t\t\t\t\tSdfRendererInterface *portRenderer)\n\t\t{\n";
+	const QString className = NameNormalizer::normalize(qualifiedName());
 
-	if (!hasPointPorts())
-		out() << "\t\t\tQ_UNUSED(pointPorts);\n";
-	if (!hasLinePorts())
-		out() << "\t\t\tQ_UNUSED(linePorts);\n";
-	if (mLabels.size() == 0)
-		out() << "\t\t\tQ_UNUSED(titles);\n"
-		<<"\t\t\tQ_UNUSED(factory);\n";
+	out() << "\tclass " << className << " : public qReal::NodeElementType\n\t{\n"
+			<< "\tpublic:\n";
 
-	QFile sdfFile("generated/shapes/" + className + "Class.sdf");
-	if (sdfFile.exists()) {
-		out() << "\t\t\tmRenderer = renderer;\n"
-		"\t\t\tmRenderer->load(QString(\":/generated/shapes/" << className << "Class.sdf\"));\n";
-		hasSdf = true;
-	} else
-		out() << "\t\t\tQ_UNUSED(portRenderer);\n";
+	out() << "\t\texplicit " << className << "(qReal::Metamodel &metamodel)\n"
+			<< "\t\t\t: NodeElementType(metamodel)\n"
+			<< "\t\t{\n";
 
-	sdfFile.setFileName("generated/shapes/" + className + "Ports.sdf");
-	if (sdfFile.exists()) {
-		out() << "\t\t\tportRenderer->load(QString(\":/generated/shapes/" << className << "Ports.sdf\"));\n";
-		hasPorts = true;
+	generateCommonData(out);
+
+	if (!mSdfDomElement.isNull()) {
+		out() << "\t\t\tloadSdf(utils::xmlUtils::loadDocument(\":/generated/shapes/"
+				+ className + "Class.sdf\").documentElement());\n";
 	}
 
-	out() << "\t\t\tcontents.setWidth(" << mWidth << ");\n"
-	<< "\t\t\tcontents.setHeight(" << mHeight << ");\n";
+	out() << "\t\t\tsetSize(QSizeF(" + QString::number(mWidth) + ", " + QString::number(mHeight) + "));\n"
+			<< "\t\t\tinitProperties();\n";
 
-	foreach (Port *port, mPorts)
-		port->generateCode(out);
+	generateMouseGesture(out);
 
-	foreach (Label *label, mLabels)
-		label->generateCodeForConstructor(out);
+	for (Port * const pointPort : mPointPorts) {
+		out() << "\t\t\taddPointPort(";
+		pointPort->generateCode(out);
+		out() << ");\n";
+	}
 
-	out() << "\t\t}\n\n";
+	for (Port * const linePort : mLinePorts) {
+		out() << "\t\t\taddLinePort(";
+		linePort->generateCode(out);
+		out() << ");\n";
+	}
 
-	out() << "\t\t ElementImpl *clone() { return NULL; }\n";
+	for (Port * const circlePort : mCircularPorts) {
+		out() << "\t\t\taddCircularPort(";
+		circlePort->generateCode(out);
+		out() << ");\n";
+	}
 
-	out() << "\t\t~" << className << "() {}\n\n"
-	<< "\t\tvoid paint(QPainter *painter, QRectF &contents)\n\t\t{\n";
+	out() << "\t\t\tsetResizable(" << boolToString(mIsResizeable) << ");\n"
+			<< "\t\t\tsetContainer(" << boolToString(!mContains.empty()) << ");\n"
+			<< "\t\t\tsetSortingContainer(" << boolToString(mContainerProperties.isSortingContainer) << ");\n";
 
-	if (hasSdf)
-		out() << "\t\t\tmRenderer->render(painter, contents);\n";
+	QStringList forestalling;
+	for (int size : mContainerProperties.sizeOfForestalling) {
+		forestalling << QString::number(size);
+	}
 
-	out() << "\t\t}\n\n";
+	out() << "\t\t\tsetSizeOfForestalling({" << forestalling.join(", ") << "});\n"
+			<< "\t\t\tsetSizeOfChildrenForestalling("
+			<< QString::number(mContainerProperties.sizeOfChildrenForestalling) << ");\n"
+			<< "\t\t\tsetChildrenMovable(" << boolToString(mContainerProperties.hasMovableChildren) << ");\n"
+			<< "\t\t\tsetMinimizesToChildren(" << boolToString(mContainerProperties.minimizesToChildren) << ");\n"
+			<< "\t\t\tsetMaximizesChildren(" << boolToString(mContainerProperties.maximizesChildren) << ");\n"
+			<< "\t\t\tsetCreateChildrenFromMenu(" << boolToString(mCreateChildrenFromMenu) << ");\n"
+			/// @todo: borders are strange things available only in qrmc. Do we need it?
+			<< "\t\t\tsetBorder({});\n"
+			<< "\t\t}\n\n";
 
-	out() << "\t\tQt::PenStyle getPenStyle() { return Qt::SolidLine; }\n\n"
-	<< "\t\tint getPenWidth() { return 0; }\n\n"
-	<< "\t\tQColor getPenColor() { return QColor(); }\n\n"
-	<< "\t\tvoid drawStartArrow(QPainter *) const {}\n"
-	<< "\t\tvoid drawEndArrow(QPainter *) const {}\n"
-	<< "\t\tbool hasPorts()\n\t\t{\n";
+	generatePropertyData(out);
 
-	out() << (hasPorts ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-	<< "\t\tvoid updateData(ElementRepoInterface *repo) const\n\t\t{\n";
-
-	if (mLabels.isEmpty())
-		out() << "\t\t\tQ_UNUSED(repo);\n";
-	else
-		foreach (Label *label, mLabels)
-			label->generateCodeForUpdateData(out);
-
-	out() << "\t\t}\n\n"
-	<< "\t\tbool isNode()\n\t\t{\n"
-	<< "\t\t\treturn true;\n"
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool isResizeable()\n\t\t{\n"
-	<< "\t\t\treturn " << (mIsResizeable ? "true" : "false") << ";\n"
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool isContainer()\n\t\t{\n"
-	<< (!mContains.empty() ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool isSortingContainer()\n\t\t{\n"
-	<< (mContainerProperties.isSortingContainer ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tint sizeOfForestalling()\n\t\t{\n"
-	<< "\t\t\treturn " + QString::number(mContainerProperties.sizeOfForestalling) + ";\n"
-	<< "\t\t}\n\n"
-
-	<< "\t\tint sizeOfChildrenForestalling()\n\t\t{\n"
-	<< "\t\t\treturn " << QString::number(mContainerProperties.sizeOfChildrenForestalling) << ";\n"
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool hasMovableChildren()\n\t\t{\n"
-	<< (mContainerProperties.hasMovableChildren ?  "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool minimizesToChildren()\n\t\t{\n"
-	<< (mContainerProperties.minimizesToChildren ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool maximizesChildren()\n\t\t{\n"
-	<< (mContainerProperties.maximizesChildren ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool isPort()\n\t\t{\n"
-	<< (mIsPin ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n"
-
-	<< "\t\tbool hasPin()\n\t\t{\n"
-	<< (mIsHavePin ? "\t\t\treturn true;\n" : "\t\t\treturn false;\n")
-	<< "\t\t}\n\n";
-
-	out() << "\t\tQList<double> border()\n\t\t{\n"
-	<< "\t\t\tQList<double> list;\n";
-	if (mIsHavePin)
-		out() << "\t\t\tlist << 30 << 15 << 15 << 25;\n";
-	else
-		out() << "\t\t\tlist << 0 << 0 << 0 << 0;\n";
-	out() << "\t\t\treturn list;\n"
-	<< "\t\t}\n\n";
-
-	out() << "\t\tQStringList bonusContextMenuFields()\n\t\t{\n" << "\t\t\treturn ";
-	if (!mBonusContextMenuFields.empty())
-		out() << "mBonusContextMenuFields;";
-	else
-		out() << "QStringList();";
-	out() << "\n\t\t}\n\n";
-
-	out() << "\tprivate:\n";
-	if (!mBonusContextMenuFields.empty())
-		out() << "\t\tQStringList mBonusContextMenuFields;\n";
-	if (hasSdf)
-		out() << "\t\tSdfRendererInterface *mRenderer;\n";
-	foreach (Label *label, mLabels)
-		label->generateCodeForFields(out);
 	out() << "\t};";
 	out() << "\n\n";
+}
+
+QList<Port *> NodeType::ports() const
+{
+	return mPointPorts + mLinePorts + mCircularPorts;
+}
+
+bool NodeType::copyPorts(NodeType* parent)
+{
+	for (Port * const port : parent->mPointPorts) {
+		mPointPorts << port->clone();
+	}
+
+	for (Port * const port : parent->mLinePorts) {
+		mLinePorts << port->clone();
+	}
+
+	for (Port * const port : parent->mCircularPorts) {
+		mCircularPorts << port->clone();
+	}
+
+	return !parent->mPointPorts.isEmpty() || !parent->mLinePorts.isEmpty() || !parent->mCircularPorts.isEmpty();
+}
+
+void NodeType::generateMouseGesture(OutFile &out)
+{
+	QString gesturePath = path();
+
+	const QString output = "\t\t\tsetMouseGesture(";
+	out() << output;
+	if (gesturePath.length() > maxLineLength - output.length()) {
+		out() << "\"" << gesturePath.left(maxLineLength - output.length());
+		gesturePath.remove(0, maxLineLength - output.length());
+		const QString prefix = "\t\t\t\"";
+		do {
+			out() << "\"\n" << prefix << gesturePath.left(maxLineLength);
+			gesturePath.remove(0, maxLineLength);
+		} while (gesturePath.length() > maxLineLength);
+
+		if (gesturePath.length() > 0) {
+			out() << "\"\n" << prefix << gesturePath;
+		}
+
+	} else {
+		out() << "\"" << gesturePath;
+	}
+
+	out() << "\");\n";
 }

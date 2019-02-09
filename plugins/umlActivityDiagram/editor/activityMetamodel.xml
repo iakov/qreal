@@ -266,7 +266,7 @@
               <contains type="ActivityDiagram::Action"/>
               <contains type="ActivityDiagram::Accept Event Action"/>
               <properties>
-                <forestalling size="25"/>
+<!--                <forestalling size="25"/> -->
               </properties>
             </container>
           </logic>
@@ -1073,6 +1073,6 @@
             </generalizations>
           </logic>
         </edge>
-      </graphicTypes>
+      </graphicTypes> 
     </diagram>
   </metamodel>

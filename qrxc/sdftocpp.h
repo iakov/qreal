@@ -1,14 +1,27 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #pragma once
 
-
-#include <QtGui/QWidget>
+#include <QtWidgets/QWidget>
 #include <QtXml/QDomDocument>
-#include <QPen>
-#include <QBrush>
-#include <QPainter>
-#include <QFont>
-#include <QFile>
-#include <QTextStream>
+#include <QtGui/QPen>
+#include <QtGui/QBrush>
+#include <QtGui/QPainter>
+#include <QtGui/QFont>
+#include <QtCore/QFile>
+#include <QtCore/QTextStream>
 #include <QtGui/QIconEngine>
 
 class SdfRenderer : public QObject
@@ -17,8 +30,8 @@ class SdfRenderer : public QObject
 
 public:
 	SdfRenderer();
-	SdfRenderer(const QString path);
-	SdfRenderer(const QDomNode &bla);
+	explicit SdfRenderer(const QString path);
+	explicit SdfRenderer(const QDomNode &bla);
 	~SdfRenderer();
 
 	bool load (const QString &filename);
@@ -28,7 +41,6 @@ public:
 private:
 	QString toGenerator;
 	QTextStream toGen;
-
 
 	QRectF bounds;
 	int first_size_x;
@@ -69,11 +81,11 @@ private:
 	bool while_condition(QString str, int i);
 };
 
-class SdfIconEngineV2: public QIconEngineV2
+class SdfIconEngineV2: public QIconEngine
 {
 public:
-	SdfIconEngineV2(QString const &file);
-	virtual void paint(QPainter *painter, QRect const &rect, QIcon::Mode mode, QIcon::State state);
+	SdfIconEngineV2(const QString &file);
+	virtual void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state);
 private:
 	SdfRenderer mRenderer;
 };

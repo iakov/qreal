@@ -1,11 +1,28 @@
+/* Copyright 2007-2016 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #include "editor.h"
+
 #include "xmlCompiler.h"
 #include "diagram.h"
 #include "type.h"
 #include "enumType.h"
-#include "../qrutils/outFile.h"
+#include "portType.h"
+#include "nameNormalizer.h"
+#include <qrutils/outFile.h>
 
-#include <QDebug>
+#include <QtCore/QDebug>
 
 Editor::Editor(QDomDocument domDocument, XmlCompiler *xmlCompiler)
 	: mXmlCompiler(xmlCompiler), mXmlDomDocument(domDocument), mLoadingComplete(false)
@@ -13,9 +30,11 @@ Editor::Editor(QDomDocument domDocument, XmlCompiler *xmlCompiler)
 
 Editor::~Editor()
 {
-	foreach(Diagram *diagram, mDiagrams.values())
-		if (diagram)
+	for (Diagram *diagram : mDiagrams.values()) {
+		if (diagram && diagram->editor() == this) {
 			delete diagram;
+		}
+	}
 }
 
 bool Editor::isLoaded()
@@ -23,69 +42,56 @@ bool Editor::isLoaded()
 	return mLoadingComplete;
 }
 
-bool Editor::load(QDir const &currentDir)
+bool Editor::load(const QDir &currentDir)
 {
-	QDomElement metamodel = mXmlDomDocument.firstChildElement("metamodel");
+	const QDomElement metamodel = mXmlDomDocument.firstChildElement("metamodel");
 	if (metamodel.isNull())
 	{
-		qDebug() << "ERROR: metamodel tag not found";
+		qCritical() << "Metamodel tag not found";
 		return false;
 	}
 
-	//Load includes
-	for (QDomElement includeElement = metamodel.firstChildElement("include"); !includeElement.isNull();
-		includeElement = includeElement.nextSiblingElement("include"))
-	{
-		QString includeFileName = includeElement.text();
-		QFileInfo includeFileInfo(currentDir, includeFileName);
-		QDir newDir = currentDir;
-		newDir.cd(includeFileInfo.canonicalPath());
-		Editor *includeFile = mXmlCompiler->loadXmlFile(newDir, includeFileInfo.fileName());
-		if (!includeFile)
-		{
-			qDebug() << "ERROR: can't include file" << includeFileName;
+	mVersion = metamodel.attribute("version");
+	QDomElement extended = metamodel.firstChildElement("extends");
+	if (!extended.isNull()) {
+		mExtendedMetamodel = resolveInclude(extended, currentDir);
+		if (mExtendedMetamodel.isEmpty()) {
 			return false;
 		}
-		mIncludes.append(includeFile);
 	}
 
-	//Load listeners
-	for (QDomElement listenerElement = metamodel.firstChildElement("listener"); !listenerElement.isNull();
-		listenerElement = listenerElement.nextSiblingElement("listener"))
+	// Load includes
+	for (QDomElement includeElement = metamodel.firstChildElement("include")
+		; !includeElement.isNull()
+		; includeElement = includeElement.nextSiblingElement("include"))
 	{
-		QString fileName = listenerElement.attribute("file");
-		QString className = listenerElement.attribute("class");
-		mListeners << QPair<QString, QString>(fileName, className);
+		resolveInclude(includeElement, currentDir);
 	}
 
 	// Load diagrams part one: don't process inherited properties.
-	for (QDomElement diagramElement = metamodel.firstChildElement("diagram"); !diagramElement.isNull();
-		diagramElement = diagramElement.nextSiblingElement("diagram"))
+	for (QDomElement diagramElement = metamodel.firstChildElement("diagram")
+		; !diagramElement.isNull()
+		; diagramElement = diagramElement.nextSiblingElement("diagram"))
 	{
-		QString diagramName = diagramElement.attribute("name");
-		QString nodeName = diagramElement.attribute("nodeName", "");
-		QString diagramDisplayedName = diagramElement.attribute("displayedName", diagramName);
+		const QString diagramName = diagramElement.attribute("name");
+		const QString nodeName = diagramElement.attribute("nodeName", "");
+		const QString diagramDisplayedName = diagramElement.attribute("displayedName", diagramName);
 
-		Diagram const *existingDiagram = mXmlCompiler->getDiagram(diagramName);
-		if (existingDiagram)
-		{
-			qDebug() << "ERROR: diagram" << diagramName << "is already loaded";
-			return false;
-		}
-		qDebug() << "parsing diagram" << diagramName;
 		Diagram *diagram = new Diagram(diagramName, nodeName, diagramDisplayedName, this);
-		if (!diagram->init(diagramElement))
-		{
-			qDebug() << "ERROR: diagram" << diagramName << "can't be parsed";
+		qDebug() << "Parsing diagram" << diagramName;
+		if (!diagram->init(diagramElement)) {
+			qCritical() << "Diagram" << diagramName << "can't be parsed";
 			delete diagram;
 			return false;
 		}
-		qDebug() << "diagram" << diagramName << "parsed";
+
+		qDebug() << "Diagram" << diagramName << "parsed";
+
 		mDiagrams[diagramName] = diagram;
 	}
 
 	// Load diagram part two: resolve all dependencies.
-	foreach (Diagram *diagram, mDiagrams.values())
+	for (Diagram *diagram : mDiagrams.values())
 		if (!diagram->resolve())
 			return false;
 
@@ -93,53 +99,81 @@ bool Editor::load(QDir const &currentDir)
 	return true;
 }
 
-XmlCompiler* Editor::xmlCompiler()
+XmlCompiler* Editor::xmlCompiler() const
 {
 	return mXmlCompiler;
 }
 
-Type* Editor::findType(QString const &name)
+QString Editor::version() const
 {
-	foreach (Diagram *diagram, mDiagrams.values()) {
-		foreach (Type *type, diagram->types()) {
-			if (type->qualifiedName() == name)
+	return mVersion;
+}
+
+Type* Editor::findType(const QString &name)
+{
+	for (Diagram *diagram : mDiagrams.values()) {
+		for (Type *type : diagram->types()) {
+			if (type->qualifiedName() == name) {
 				return type;
+			}
 		}
 	}
 
-	foreach (Editor *editor, mIncludes) {
+	for (Editor *editor : mIncludes) {
 		Type *type = editor->findType(name);
-		if (type != NULL && type->qualifiedName() == name)
+		if (type != nullptr && type->qualifiedName() == name) {
 			return type;
+		}
 	}
-	return NULL;
+
+	return nullptr;
+}
+
+Type *Editor::findTypeByNormalizedName(const QString &name)
+{
+	for (Diagram *diagram : mDiagrams.values()) {
+		for (Type *type : diagram->types()) {
+			if (NameNormalizer::normalize(type->name()) == name) {
+				return type;
+			}
+		}
+	}
+
+	for (Editor *editor : mIncludes) {
+		Type *type = editor->findType(name);
+		if (type != nullptr && NameNormalizer::normalize(type->name()) == name) {
+			return type;
+		}
+	}
+
+	return nullptr;
 }
 
 QSet<EnumType*> Editor::getAllEnumTypes()
 {
-	EnumType *current = NULL;
+	EnumType *current = nullptr;
 	QSet<EnumType*> result;
 
-	foreach (Diagram *diagram, mDiagrams.values()) {
-		foreach (Type *type, diagram->types()) {
+	for (Diagram *diagram : mDiagrams.values()) {
+		for (Type *type : diagram->types()) {
 			current = dynamic_cast<EnumType*>(type);
 			if (current)
 				result << current;
 		}
 	}
 
-	foreach (Editor *editor, mIncludes) {
+	for (Editor *editor : mIncludes) {
 		result += editor->getAllEnumTypes();
 	}
 
 	return result;
 }
 
-Diagram* Editor::findDiagram(QString const &name)
+Diagram* Editor::findDiagram(const QString &name)
 {
 	if (mDiagrams.contains(name))
 		return mDiagrams[name];
-	return NULL;
+	return nullptr;
 }
 
 QMap<QString, Diagram*> Editor::diagrams()
@@ -147,25 +181,23 @@ QMap<QString, Diagram*> Editor::diagrams()
 	return mDiagrams;
 }
 
-void Editor::generateListenerIncludes(utils::OutFile &out) const
+QString Editor::resolveInclude(const QDomElement &includeElement, const QDir &currentDir)
 {
-	typedef QPair<QString, QString> StringPair;
-	foreach (StringPair listener, mListeners) {
-		out() << "#include \"../" << listener.first << ".h\"\n";
+	const QString includeFileName = includeElement.text();
+	const QFileInfo includeFileInfo(currentDir, includeFileName);
+	QDir newDir = currentDir;
+	newDir.cd(includeFileInfo.canonicalPath());
+	Editor *includeFile = mXmlCompiler->loadXmlFile(newDir, includeFileInfo.fileName());
+	if (!includeFile) {
+		qCritical() << "Can't include file" << includeFileName;
+		return nullptr;
 	}
-	out() << "\n";
+
+	mIncludes.append(includeFile);
+	return NameNormalizer::normalize(includeFileInfo.completeBaseName());;
 }
 
-void Editor::generateListenerFactory(utils::OutFile &out, QString const &pluginName) const
+QString Editor::extendedEditor() const
 {
-	out() << "QList<qReal::ListenerInterface*> " + pluginName + "Plugin::listeners() const\n"
-		<< "{\n"
-		<< "\tQList<qReal::ListenerInterface*> result;\n";
-
-	typedef QPair<QString, QString> StringPair;
-	foreach (StringPair listener, mListeners)
-		out() << "\tresult << new " + listener.second + ";\n";
-
-	out() << "\treturn result;\n"
-		<< "}\n";
+	return mExtendedMetamodel;
 }

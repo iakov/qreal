@@ -1,31 +1,47 @@
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #pragma once
 
-#include <QtGui/QAbstractItemView>
+#include <QtWidgets/QAbstractItemView>
 
-#include "abstractModel.h"
+#include "qrgui/models/details/modelsImplementation/abstractModel.h"
 
 namespace qReal {
-
 namespace models {
-
 namespace details {
-
 namespace modelsImplementation {
 
 class AbstractView : public QAbstractItemView
 {
 	Q_OBJECT
+
 public:
-	AbstractView(AbstractModel * const model);
+	explicit AbstractView(AbstractModel * const model);
+	virtual ~AbstractView();
 
 public slots:
-	void rowsAboutToBeMoved(QModelIndex const &sourceParent, int sourceStart, int sourceEnd, QModelIndex const &destinationParent, int destinationRow);
-	void rowsMoved(QModelIndex const &sourceParent, int sourceStart, int sourceEnd, QModelIndex const &destinationParent, int destinationRow);
+	void rowsAboutToBeMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd
+			, const QModelIndex &destinationParent, int destinationRow);
+	void rowsMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd
+			, const QModelIndex &destinationParent, int destinationRow);
 
 protected slots:
-	void dataChanged(QModelIndex const &topLeft, QModelIndex const &bottomRight);
-	virtual void rowsAboutToBeRemoved(QModelIndex const &parent, int start, int end);
-	void rowsInserted(QModelIndex const &parent, int start, int end);
+	virtual void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight
+			, QVector<int> const &roles = QVector<int>());
+	virtual void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end);
+	virtual void rowsInserted(const QModelIndex &parent, int start, int end);
 
 protected:
 	AbstractModel * const mModel;
@@ -46,9 +62,6 @@ protected:
 };
 
 }
-
 }
-
 }
-
 }

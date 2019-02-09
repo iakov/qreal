@@ -1,19 +1,51 @@
+/* Copyright 2007-2015 QReal Research Group, Dmitry Mordvinov
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
+
 #include "outFile.h"
 
+#include <QtCore/QBuffer>
 
-#include "../qrkernel/exception/exception.h"
+#include <qrkernel/logging.h>
 
 using namespace utils;
 
-OutFile::OutFile(QString const &fileName)
-	: mIndent(0)
+OutFile::OutFile(const QString &fileName, bool *success)
+	: mFile(fileName)
+	, mOut(&mDummyArray)
 {
-	mFile.setFileName(fileName);
-	mFile.open(QIODevice::WriteOnly | QIODevice::Text);
-	if (!mFile.isOpen())
-		throw qReal::Exception("File open operation failed");
+	if (fileName.isEmpty()) {
+		if (success) {
+			*success = false;
+		}
+
+		return;
+	}
+
+	if (!mFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		QLOG_ERROR() << QString("Opening %1 for write failed: %2").arg(fileName, mFile.errorString());
+		if (success) {
+			*success = false;
+		}
+
+		return;
+	}
+
 	mOut.setDevice(&mFile);
 	mOut.setCodec("UTF-8");
+	if (success) {
+		*success = true;
+	}
 }
 
 OutFile::~OutFile()
@@ -21,26 +53,17 @@ OutFile::~OutFile()
 	mFile.close();
 }
 
-QTextStream& OutFile::operator()()
+QTextStream &OutFile::operator()()
 {
-	mOut << indent();
 	return mOut;
 }
 
-void OutFile::incIndent()
+void OutFile::flush()
 {
-	++mIndent;
+	mOut.flush();
 }
 
-void OutFile::decIndent()
+QString OutFile::errorString() const
 {
-	--mIndent;
-}
-
-QString OutFile::indent() const
-{
-	QString result;
-	for (int i = 0; i < mIndent; ++i)
-		result += "\t";
-	return result;
+	return mFile.errorString();
 }

@@ -1,7 +1,22 @@
-#include "type.h"
-#include "property.h"
+/* Copyright 2007-2015 QReal Research Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. */
 
-#include <QDebug>
+#include "type.h"
+
+#include <QtCore/QDebug>
+
+#include "property.h"
 
 Type::Type(bool isResolved, Diagram *diagram)
 	: mResolvingFinished(isResolved), mDiagram(diagram)
@@ -9,20 +24,19 @@ Type::Type(bool isResolved, Diagram *diagram)
 
 Type::~Type()
 {
-	foreach (Property *property, mProperties.values())
-		if (property)
-			delete property;
+	qDeleteAll(mProperties);
 }
 
-bool Type::init(QDomElement const &element, QString const &context)
+bool Type::init(const QDomElement &element, const QString &context)
 {
 	mName = element.attribute("name");
 	mContext = context;
 	mNativeContext = context;
-	if (mName == "") {
-		qDebug() << "ERROR: anonymous type found";
+	if (mName.isEmpty()) {
+		qWarning() << "ERROR: anonymous type found. Tag name:" << element.tagName();
 		return false;
 	}
+
 	mDisplayedName = element.attribute("displayedName", mName);
 	mPath = element.attribute("path", "");
 	return true;
@@ -58,12 +72,12 @@ QString Type::nativeContext() const
 	return mNativeContext;
 }
 
-void Type::setContext(QString const &newContext)
+void Type::setContext(const QString &newContext)
 {
 	mContext = newContext;
 }
 
-void Type::setName(QString const &name)
+void Type::setName(const QString &name)
 {
 	mName = name;
 }
@@ -73,7 +87,12 @@ QString Type::displayedName() const
 	return mDisplayedName;
 }
 
-void Type::setDisplayedName(QString const &displayedName)
+Diagram *Type::diagram() const
+{
+	return mDiagram;
+}
+
+void Type::setDisplayedName(const QString &displayedName)
 {
 	mDisplayedName = displayedName;
 }
@@ -94,7 +113,7 @@ void Type::copyFields(Type *type) const
 	type->mContext = mContext;
 	type->mNativeContext = mNativeContext;
 	type->mDisplayedName = mDisplayedName;
-	foreach (QString propertyName, mProperties.keys())
+	for (const QString &propertyName :mProperties.keys())
 		type->mProperties.insert(propertyName, mProperties[propertyName]->clone());
 	type->mResolvingFinished = mResolvingFinished;
 	type->mDiagram = mDiagram;

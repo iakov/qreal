@@ -1,30 +1,47 @@
+# Copyright 2007-2015 QReal Research Group
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 TEMPLATE = subdirs
 
-SUBDIRS	= \
-#	additionsEditor/additionsEditor.pro \
-#	android/android.pro \
-#	blockDiagram/blockDiagram.pro \
-#	android/android.pro \
-#	blockDiagram/blockDiagram.pro \
-#	bpel/bpel.pro \
-#	exterminatus/exterminatus.pro \
-#	hascol/hascol.pro \
-	metaEditor/metaEditor.pro \
-#	network/network.pro \
-#	orthodoxEditor/orthodoxEditor.pro \
-#	parallel/parallel.pro \
-#	requirements/requirements.pro \
-#	robots/robots.pro \
-#	testEditor/testEditor.pro \
-#	umlActivityDiagram/umlActivityDiagram.pro \
-#	umlClassDiagram/umlClassDiagram.pro \
-#	umlCommunicationDiagram/umlCommunicationDiagram.pro \
-#	umlComponentDiagram/umlComponentDiagram.pro \
-#	umlDeploymentDiagram/umlDeploymentDiagram.pro \
-#	umlPackageDiagram/umlPackageDiagram.pro \
-#	umlSequenceDiagram/umlSequenceDiagram.pro \
-#	umlStateMachinesDiagram/umlStateMachinesDiagram.pro \
-#	umlTimingDiagram/umlTimingDiagram.pro \
-#	umlUseCaseDiagram/umlUseCaseDiagram.pro \
-	ubiq/ubiq.pro \
+include(common.pri)
 
+# editor plugins
+SUBDIRS += \
+	$$PWD/ains/ains.pro \
+	$$PWD/blockDiagram/blockDiagram.pro \
+	$$PWD/deployment/deploymentEditor.pro \
+	$$PWD/domainAnalysis/domainAnalysis.pro \
+	$$PWD/dragonDiagram/dragonDiagram.pro \
+	$$PWD/hascol/hascol.pro \
+	$$PWD/metaEditor/metaEditor.pro \
+	$$PWD/requirements/requirements.pro \
+
+# interpreted plugins
+SUBDIRS += \
+	generationRulesTool/generationRulesTool.pro \
+
+# tool plugins
+SUBDIRS += \
+	$$PWD/tools/exterminatus/exterminatus.pro \
+	$$PWD/tools/visualInterpreter/visualInterpreter.pro \
+	$$PWD/tools/refactoring/refactoring.pro \
+	$$PWD/tools/uxInfo/uxInfo.pro \
+
+
+win32:CONFIG(release): LIBS += -L$$OUT_PWD/../qrutils/release/ -lqrutils
+else:win32:CONFIG(debug): LIBS += -L$$OUT_PWD/../qrutils/debug/ -lqrutils
+else:unix: LIBS += -L$$OUT_PWD/../qrutils/ -lqrutils
+
+INCLUDEPATH += $$PWD/../qrutils
+DEPENDPATH += $$PWD/../qrutils
